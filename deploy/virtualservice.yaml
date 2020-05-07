@@ -1,0 +1,48 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: test-api
+  namespace: demo-k8s
+spec:
+  hosts:
+  - "*"
+  gateways:
+  - demo-api-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        port:
+          number: 80
+        host: test-api
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: demo-api-gateway
+  namespace: demo-k8s
+  annotations:
+    pigment.so/dns-type: private
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+      - "demo-api.example.com"
+    # tls:
+    #   httpsRedirect: true
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: demo-api-cert
+    hosts:
+      - "demo-api.example.com"

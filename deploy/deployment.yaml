@@ -1,0 +1,115 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-api
+  namespace: demo-k8s
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: test
+      app.kubernetes.io/component: api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: test
+        app.kubernetes.io/component: api
+    spec:
+      # When killing the pod, kubernetes will send a SIGTERM to the containers
+      # and wait for this grace-period before sending the SIGKILL. This leaves
+      # enough times for our containers to gracefully shutdown
+      terminationGracePeriodSeconds: 11
+
+      # This rule tells Kubernetes to put our APIs on the machines of the
+      # webserver flavor (i.e. tagged with flavor=webserver)
+      nodeSelector:
+        flavor: webserver
+
+      # These rules tell Kubernetes not to put two Pods of the same deployment
+      # on the same node (to be node-failure tolerant) and, ideally, on
+      # different failure zones (to be zone-failure tolerant). They are just
+      # "soft" rules and won't lead to extra nodes being created.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                  - test
+                - key: app.kubernetes.io/component
+                  operator: In
+                  values:
+                  - api
+              topologyKey: kubernetes.io/hostname
+          - weight: 50
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                  - test
+                - key: app.kubernetes.io/component
+                  operator: In
+                  values:
+                  - api
+              topologyKey: failure-domain.beta.kubernetes.io/zone
+
+      containers:
+
+      # The ASPNETCORE API container
+      - name: api
+        image: elafarge/k8s-introduction:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+          name: http
+        env:
+        - name: PERSON_TO_GREET
+          value: Seb
+
+        # The readiness probe is the health Kubernetes uses to know if it can send
+        # traffic to a given pod, or not
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 1
+          timeoutSeconds: 2
+          periodSeconds: 5
+          successThreshold: 2
+          failureThreshold: 1
+
+        # When the liveness probe fails (for 5 consecutive times as per our
+        # configuration), kubernetes explicitely restarts all the containers in
+        # the pod
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 1
+          timeoutSeconds: 2
+          periodSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
+
+
+        # These are just defaults resource requirements. They can be overriden on
+        # a per-app basis
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 256Mi

@@ -1,0 +1,13 @@
+apiVersion: cert-manager.io/v1alpha2
+kind: Certificate
+metadata:
+  name: demo-api-cert
+  namespace: istio-system
+spec:
+  secretName: demo-api-cert
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  commonName: 'demo-api.example.com'
+  dnsNames:
+  - 'demo-api.example.com'
